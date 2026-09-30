@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>California house value estimator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=Young+Serif&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fog: #EEF3F3;
+    --ink: #10222B;
+    --ink-soft: #4A5F69;
+    --line: #C9D6D8;
+    --pacific: #1B6B86;
+    --pacific-dark: #14536A;
+    --deep: #0F2E3D;
+    --land: #E4EEE9;
+    --poppy: #F2B233;
+    --sea-text: #BFD6DC;
+    --serif: "Young Serif", Georgia, "Times New Roman", serif;
+    --sans: "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { color-scheme: light; }
+  body {
+    margin: 0;
+    background: var(--fog);
+    color: var(--ink);
+    font: 400 1rem/1.55 var(--sans);
+  }
+  button { font: inherit; cursor: pointer; }
+  :focus-visible { outline: 3px solid var(--pacific); outline-offset: 2px; }
+  .panel :focus-visible { outline-color: var(--poppy); }
+  .visually-hidden {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  .shell { max-width: 1120px; margin: 0 auto; padding: 48px 24px 72px; }
+
+  header {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    flex-wrap: wrap; gap: 24px 48px; margin-bottom: 48px;
+  }
+  h1 {
+    font: 400 clamp(2.25rem, 5vw, 3.5rem)/1.06 var(--serif);
+    letter-spacing: -0.01em;
+    margin: 0 0 14px;
+    max-width: 15ch;
+  }
+  .lede { margin: 0; max-width: 50ch; color: var(--ink-soft); }
+
+  .modes { display: inline-flex; gap: 4px; padding: 4px; background: #DCE6E7; border-radius: 10px; }
+  .modes button {
+    border: 0; background: transparent; color: var(--ink-soft);
+    padding: 9px 18px; border-radius: 7px; font-weight: 500;
+  }
+  .modes button[aria-pressed="true"] {
+    background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(16, 34, 43, .18);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+    gap: 64px;
+    align-items: start;
+  }
+
+  /* ---------- form ---------- */
+  .examples {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
+    margin-bottom: 32px; color: var(--ink-soft); font-size: .9375rem;
+  }
+  .examples button {
+    border: 1px solid var(--line); background: transparent; color: var(--ink);
+    padding: 6px 14px; border-radius: 999px; font-size: .875rem;
+    transition: border-color .15s, color .15s;
+  }
+  .examples button:hover { border-color: var(--pacific); color: var(--pacific-dark); }
+
+  .group { border-top: 1px solid var(--line); padding-top: 24px; margin-bottom: 32px; }
+  .group h2 { font: 400 1.25rem/1.2 var(--serif); margin: 0 0 4px; }
+  .group .sub { margin: 0 0 20px; color: var(--ink-soft); font-size: .9375rem; }
+  .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .field.wide { grid-column: 1 / -1; }
+  label { display: block; font-weight: 600; font-size: .875rem; margin-bottom: 6px; }
+  input, select {
+    width: 100%; height: 46px; padding: 0 12px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: #fff; color: var(--ink); font: inherit;
+  }
+  input:hover, select:hover { border-color: #9DB2B7; }
+  .hint { margin: 6px 0 0; font-size: .8125rem; color: var(--ink-soft); }
+
+  .primary {
+    border: 0; background: var(--pacific); color: #fff; font-weight: 600;
+    padding: 13px 28px; border-radius: 8px; transition: background .15s;
+  }
+  .primary:hover { background: var(--pacific-dark); }
+  .primary:disabled { background: #7FA6B4; cursor: progress; }
+  .secondary {
+    border: 1px solid var(--pacific); background: transparent; color: var(--pacific-dark);
+    font-weight: 600; padding: 11px 22px; border-radius: 8px;
+  }
+  .secondary:hover { background: rgba(27, 107, 134, .08); }
+  .error { margin: 16px 0 0; color: #A3311F; font-weight: 500; max-width: 60ch; }
+
+  /* ---------- batch view ---------- */
+  #view-batch h2 { font: 400 1.5rem/1.2 var(--serif); margin: 0 0 8px; }
+  #view-batch > p { margin: 0 0 24px; color: var(--ink-soft); max-width: 58ch; }
+  .drop {
+    display: block; text-align: center; padding: 40px 24px;
+    border: 2px dashed #9DB2B7; border-radius: 14px; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .drop:hover, .drop.over, .drop:focus-within { border-color: var(--pacific); background: rgba(27, 107, 134, .06); }
+  .drop-title { display: block; font-weight: 600; margin-bottom: 4px; }
+  .drop-sub { display: block; font-size: .875rem; color: var(--ink-soft); }
+  #table-wrap { margin-top: 32px; }
+  .table-scroll { overflow-x: auto; margin-bottom: 20px; }
+  table { border-collapse: collapse; width: 100%; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 10px 16px 10px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { font-weight: 600; color: var(--ink-soft); font-size: .875rem; }
+  td.num, th.num { text-align: right; padding-right: 0; padding-left: 16px; }
+  .table-note { margin: 0 0 16px; color: var(--ink-soft); font-size: .875rem; }
+
+  /* ---------- map + result panel ---------- */
+  .panel {
+    position: sticky; top: 24px;
+    background: var(--deep); color: #EAF3F5;
+    border-radius: 20px; padding: 20px 20px 28px;
+  }
+  .map { display: block; width: 100%; height: auto; max-height: 440px; }
+  .panel.clickable .map { cursor: crosshair; }
+  .map .land { fill: var(--land); }
+  .map text { font-family: var(--sans); font-size: 11px; }
+  .pin { transition: transform .3s cubic-bezier(.2, .8, .2, 1); }
+  .map-hint { margin: 10px 0 24px; font-size: .8125rem; color: var(--sea-text); }
+
+  .result-label { margin: 0 0 4px; font-size: .9375rem; color: var(--sea-text); }
+  .price { margin: 0 0 20px; font: 400 clamp(2.5rem, 6vw, 3.5rem)/1.05 var(--serif); color: var(--poppy); font-variant-numeric: tabular-nums; }
+  .range { position: relative; height: 8px; background: rgba(255, 255, 255, .14); border-radius: 4px; }
+  .range-fill { position: absolute; top: 0; bottom: 0; background: #6FB3C8; border-radius: 4px; }
+  .range-dot {
+    position: absolute; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px;
+    background: var(--poppy); border: 3px solid var(--deep); border-radius: 50%;
+  }
+  .range-ends { display: flex; justify-content: space-between; margin: 8px 0 14px; font-size: .8125rem; color: var(--sea-text); }
+  .range-note { margin: 0; font-size: .9375rem; }
+  .empty { margin: 0; color: var(--sea-text); font-size: .9375rem; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 0 0 20px; }
+  .stats dt { font-size: .8125rem; color: var(--sea-text); }
+  .stats dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .legend { display: flex; align-items: center; gap: 10px; font-size: .8125rem; color: var(--sea-text); }
+  .legend i { flex: 1; height: 8px; border-radius: 4px; background: linear-gradient(90deg, rgb(27, 107, 134), rgb(242, 150, 30)); }
+  .fine { margin: 24px 0 0; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, .16); font-size: .8125rem; color: var(--sea-text); }
+
+  @media (max-width: 880px) {
+    .grid { grid-template-columns: minmax(0, 1fr); gap: 48px; }
+    .panel { position: static; }
+  }
+  @media (max-width: 520px) {
+    .fields { grid-template-columns: minmax(0, 1fr); }
+    .shell { padding-top: 32px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pin { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div>
+      <h1>What is a California neighborhood worth?</h1>
+      <p class="lede">Describe an area from the 1990 census and a random forest model estimates its median house value.</p>
+    </div>
+    <div class="modes" role="group" aria-label="Input type">
+      <button type="button" id="btn-single" aria-pressed="true">One area</button>
+      <button type="button" id="btn-batch" aria-pressed="false">CSV file</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div>
+      <!-- ============ single area ============ -->
+      <section id="view-single">
+        <div class="examples">
+          <span>Start from an example:</span>
+          <button type="button" data-preset="berkeley">Berkeley hills</button>
+          <button type="button" data-preset="la">Los Angeles</button>
+          <button type="button" data-preset="fresno">Fresno</button>
+          <button type="button" data-preset="sandiego">San Diego coast</button>
+        </div>
+
+        <form id="form">
+          <section class="group" aria-labelledby="h-location">
+            <h2 id="h-location">Location</h2>
+            <p class="sub">Type coordinates or click the map.</p>
+            <div class="fields">
+              <div class="field">
+                <label for="longitude">Longitude</label>
+                <input id="longitude" name="longitude" type="number" step="0.01" min="-124.5" max="-114" inputmode="decimal" required>
+                <p class="hint">West is negative, so -122.4 is San Francisco.</p>
+              </div>
+              <div class="field">
+                <label for="latitude">Latitude</label>
+                <input id="latitude" name="latitude" type="number" step="0.01" min="32.5" max="42" inputmode="decimal" required>
+                <p class="hint">Between 32.5 and 42.</p>
+              </div>
+              <div class="field wide">
+                <label for="ocean_proximity">Distance to the ocean</label>
+                <select id="ocean_proximity" name="ocean_proximity" required>
+                  <option value="<1H OCEAN">Within an hour of the ocean</option>
+                  <option value="NEAR OCEAN">Near the ocean</option>
+                  <option value="NEAR BAY">Near the bay</option>
+                  <option value="INLAND">Inland</option>
+                  <option value="ISLAND">Island</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <section class="group" aria-labelledby="h-homes">
+            <h2 id="h-homes">The homes</h2>
+            <p class="sub">Totals for the whole area, not for one house.</p>
+            <div class="fields">
+              <div class="field">
+                <label for="housing_median_age">Median home age (years)</label>
+                <input id="housing_median_age" name="housing_median_age" type="number" step="1" min="0" max="100" inputmode="numeric" required>
+              </div>
+              <div class="field">
+                <label for="total_rooms">Total rooms</label>
+                <input id="total_rooms" name="total_rooms" type="number" step="1" min="1" inputmode="numeric" required>
+              </div>
+              <div class="field">
+                <label for="total_bedrooms">Total bedrooms</label>
+                <input id="total_bedrooms" name="total_bedrooms" type="number" step="1" min="0" inputmode="numeric">
+                <p class="hint">Optional. The model fills in a typical value if you leave it blank.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="group" aria-labelledby="h-people">
+            <h2 id="h-people">The people</h2>
+            <div class="fields">
+              <div class="field">
+                <label for="population">Population</label>
+                <input id="population" name="population" type="number" step="1" min="1" inputmode="numeric" required>
+              </div>
+              <div class="field">
+                <label for="households">Households</label>
+                <input id="households" name="households" type="number" step="1" min="1" inputmode="numeric" required>
+              </div>
+              <div class="field">
+                <label for="median_income">Median income ($10,000s)</label>
+                <input id="median_income" name="median_income" type="number" step="any" min="0" inputmode="decimal" required>
+                <p class="hint">3.9 means about $39,000 a year.</p>
+              </div>
+            </div>
+          </section>
+
+          <button class="primary" id="go" type="submit">Estimate value</button>
+          <p id="error" class="error" role="alert" hidden></p>
+        </form>
+      </section>
+
+      <!-- ============ CSV batch ============ -->
+      <section id="view-batch" hidden>
+        <h2>Estimate many areas at once</h2>
+        <p>Upload a CSV with the columns longitude, latitude, housing_median_age, total_rooms, total_bedrooms, population, households, median_income and ocean_proximity.</p>
+        <label class="drop" id="drop">
+          <input class="visually-hidden" type="file" id="file" accept=".csv,text/csv">
+          <span class="drop-title">Drop a CSV here or choose a file</span>
+          <span class="drop-sub" id="drop-sub">The input.csv created by your training script works as it is.</span>
+        </label>
+        <p id="batch-error" class="error" role="alert" hidden></p>
+        <div id="table-wrap" hidden>
+          <p class="table-note" id="table-note"></p>
+          <div class="table-scroll"><table id="table"></table></div>
+          <button class="secondary" id="download" type="button">Download predictions</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============ map + results ============ -->
+    <aside class="panel clickable" id="panel" aria-live="polite">
+      <svg class="map" id="map" viewBox="0 0 424 490" role="img" aria-label="Map of California showing the chosen location">
+        <path class="land" id="land"></path>
+        <g id="cities"></g>
+        <g id="dots"></g>
+        <g class="pin" id="pin" style="display:none">
+          <circle r="13" fill="none" stroke="#F2B233" stroke-opacity=".45" stroke-width="2"></circle>
+          <circle r="6" fill="#F2B233" stroke="#0F2E3D" stroke-width="2.5"></circle>
+        </g>
+      </svg>
+      <p class="map-hint" id="map-hint">Click inside the state to move the pin.</p>
+
+      <div id="single-result">
+        <p class="empty" id="single-empty">Fill in the details and choose Estimate value.</p>
+        <div id="single-done" hidden>
+          <p class="result-label">Estimated median house value</p>
+          <p class="price" id="price">$0</p>
+          <div class="range" aria-hidden="true">
+            <div class="range-fill" id="range-fill"></div>
+            <div class="range-dot" id="range-dot"></div>
+          </div>
+          <div class="range-ends" aria-hidden="true"><span>$0</span><span>$500k</span></div>
+          <p class="range-note" id="range-note"></p>
+        </div>
+      </div>
+
+      <div id="batch-result" hidden>
+        <p class="empty" id="batch-empty">Upload a CSV to plot every estimate on the map.</p>
+        <div id="batch-done" hidden>
+          <p class="result-label">Average estimated value</p>
+          <p class="price" id="b-mean">$0</p>
+          <dl class="stats">
+            <div><dt>Areas</dt><dd id="b-count"></dd></div>
+            <div><dt>Lowest</dt><dd id="b-min"></dd></div>
+            <div><dt>Highest</dt><dd id="b-max"></dd></div>
+          </dl>
+          <div class="legend"><span>Lower</span><i></i><span>Higher</span></div>
+        </div>
+      </div>
+
+      <p class="fine">The model learned from 1990 census data, so estimates reflect 1990 prices and stop near $500,000.</p>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  // Same origin as the Flask server, so a relative URL is enough.
+  // If you ever host this page somewhere else, set this to "http://127.0.0.1:5000"
+  // and enable CORS on the backend (pip install flask-cors).
+  const API_BASE = "";
+  const PRED = "predicted_median_house_value";
+
+  const $ = (id) => document.getElementById(id);
+  const money = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const SVGNS = "http://www.w3.org/2000/svg";
+
+  /* ---------------- map ---------------- */
+  // Rough outline of California as [longitude, latitude], clockwise from the north-west corner.
+  const CA = [
+    [-124.21, 42.00], [-120.00, 42.00], [-120.00, 39.00], [-114.63, 35.00], [-114.13, 34.30],
+    [-114.43, 34.08], [-114.53, 33.03], [-114.72, 32.72], [-117.13, 32.53], [-117.25, 32.75],
+    [-117.28, 33.00], [-117.40, 33.20], [-117.70, 33.46], [-118.20, 33.75], [-118.40, 33.75],
+    [-118.50, 34.02], [-119.10, 34.10], [-119.30, 34.28], [-119.70, 34.40], [-120.47, 34.45],
+    [-120.65, 34.58], [-120.65, 35.13], [-120.87, 35.37], [-121.50, 36.00], [-121.90, 36.60],
+    [-122.00, 36.95], [-122.50, 37.50], [-122.51, 37.78], [-123.00, 38.00], [-123.05, 38.30],
+    [-123.70, 38.95], [-124.40, 40.44], [-124.20, 40.80], [-124.20, 41.75]
+  ];
+  const CITIES = [
+    ["San Francisco", -122.42, 37.77, "l"],
+    ["Los Angeles", -118.24, 34.05, "l"],
+    ["San Diego", -117.16, 32.72, "l"],
+    ["Sacramento", -121.49, 38.58, "r"]
+  ];
+  const X0 = -124.6, Y0 = 42.2, KX = 40, KY = 50;
+  const proj = (lon, lat) => [(lon - X0) * KX, (Y0 - lat) * KY];
+  const unproj = (x, y) => [x / KX + X0, Y0 - y / KY];
+
+  function inside(lon, lat) {
+    let c = false;
+    for (let i = 0, j = CA.length - 1; i < CA.length; j = i++) {
+      const [xi, yi] = CA[i], [xj, yj] = CA[j];
+      if ((yi > lat) !== (yj > lat) && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) c = !c;
+    }
+    return c;
+  }
+
+  const map = $("map"), pin = $("pin"), dots = $("dots");
+  $("land").setAttribute("d", "M" + CA.map(([lo, la]) => proj(lo, la).map((v) => v.toFixed(1)).join(",")).join("L") + "Z");
+
+  const cities = $("cities");
+  CITIES.forEach(([name, lon, lat, side]) => {
+    const [x, y] = proj(lon, lat);
+    const dot = document.createElementNS(SVGNS, "circle");
+    dot.setAttribute("cx", x); dot.setAttribute("cy", y); dot.setAttribute("r", 2.5);
+    dot.setAttribute("fill", "#0F2E3D"); dot.setAttribute("fill-opacity", ".55");
+    const label = document.createElementNS(SVGNS, "text");
+    label.setAttribute("x", side === "l" ? x - 9 : x + 9);
+    label.setAttribute("y", y + 4);
+    label.setAttribute("text-anchor", side === "l" ? "end" : "start");
+    label.setAttribute("fill", side === "l" ? "#BFD6DC" : "#10222B");
+    label.textContent = name;
+    cities.append(dot, label);
+  });
+
+  function movePin() {
+    const lon = parseFloat($("longitude").value), lat = parseFloat($("latitude").value);
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) { pin.style.display = "none"; return; }
+    const [x, y] = proj(lon, lat);
+    pin.style.display = "";
+    pin.style.transform = `translate(${x}px, ${y}px)`;
+  }
+  $("longitude").addEventListener("input", movePin);
+  $("latitude").addEventListener("input", movePin);
+
+  map.addEventListener("click", (ev) => {
+    if (mode !== "single") return;
+    const p = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(map.getScreenCTM().inverse());
+    const [lon, lat] = unproj(p.x, p.y);
+    if (!inside(lon, lat)) return;
+    $("longitude").value = lon.toFixed(2);
+    $("latitude").value = lat.toFixed(2);
+    movePin();
+  });
+
+  /* ---------------- presets ---------------- */
+  const PRESETS = {
+    berkeley: { longitude: -122.23, latitude: 37.88, housing_median_age: 41, total_rooms: 880, total_bedrooms: 129, population: 322, households: 126, median_income: 8.3252, ocean_proximity: "NEAR BAY" },
+    la:       { longitude: -118.30, latitude: 34.05, housing_median_age: 35, total_rooms: 2100, total_bedrooms: 450, population: 1400, households: 420, median_income: 3.2, ocean_proximity: "<1H OCEAN" },
+    fresno:   { longitude: -119.80, latitude: 36.75, housing_median_age: 28, total_rooms: 2400, total_bedrooms: 500, population: 1500, households: 470, median_income: 2.6, ocean_proximity: "INLAND" },
+    sandiego: { longitude: -117.25, latitude: 32.75, housing_median_age: 30, total_rooms: 2500, total_bedrooms: 520, population: 1200, households: 500, median_income: 4.8, ocean_proximity: "NEAR OCEAN" }
+  };
+  function applyPreset(name) {
+    Object.entries(PRESETS[name]).forEach(([k, v]) => { $(k).value = v; });
+    movePin();
+  }
+  document.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => applyPreset(b.dataset.preset)));
+  applyPreset("berkeley");
+
+  /* ---------------- modes ---------------- */
+  let mode = "single";
+  function setMode(next) {
+    mode = next;
+    const single = next === "single";
+    $("view-single").hidden = !single;
+    $("view-batch").hidden = single;
+    $("single-result").hidden = !single;
+    $("batch-result").hidden = single;
+    $("btn-single").setAttribute("aria-pressed", String(single));
+    $("btn-batch").setAttribute("aria-pressed", String(!single));
+    $("panel").classList.toggle("clickable", single);
+    $("map-hint").hidden = !single;
+    dots.style.display = single ? "none" : "";
+    if (single) movePin(); else pin.style.display = "none";
+  }
+  $("btn-single").addEventListener("click", () => setMode("single"));
+  $("btn-batch").addEventListener("click", () => setMode("batch"));
+
+  /* ---------------- talking to the backend ---------------- */
+  function connectionMessage() {
+    return location.protocol === "file:"
+      ? "This page was opened as a file. Start the server with python app.py and open http://127.0.0.1:5000 instead."
+      : "Can't reach the model server. Check that python app.py is still running.";
+  }
+
+  function countUp(el, to) {
+    if (reduceMotion) { el.textContent = money(to); return; }
+    const t0 = performance.now(), dur = 700;
+    (function step(t) {
+      const p = Math.min(1, (t - t0) / dur);
+      el.textContent = money(to * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+    })(t0);
+  }
+
+  $("form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const err = $("error"), btn = $("go");
+    err.hidden = true;
+
+    const payload = { ocean_proximity: $("ocean_proximity").value };
+    ["longitude", "latitude", "housing_median_age", "total_rooms", "total_bedrooms", "population", "households", "median_income"].forEach((k) => {
+      const raw = $(k).value.trim();
+      payload[k] = raw === "" ? null : Number(raw);
+    });
+
+    btn.disabled = true; btn.textContent = "Estimating…";
+    try {
+      const res = await fetch(`${API_BASE}/api/predict`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "The server could not make an estimate.");
+
+      $("single-empty").hidden = true;
+      $("single-done").hidden = false;
+      countUp($("price"), data.prediction);
+      const SCALE = 500000, pct = (v) => Math.max(0, Math.min(100, (v / SCALE) * 100));
+      $("range-fill").style.left = pct(data.low) + "%";
+      $("range-fill").style.width = Math.max(1, pct(data.high) - pct(data.low)) + "%";
+      $("range-dot").style.left = pct(data.prediction) + "%";
+      $("range-note").textContent = `The forest's 100 trees mostly agree: 80% of them predict between ${money(data.low)} and ${money(data.high)}.`;
+
+      if (matchMedia("(max-width: 880px)").matches) $("panel").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    } catch (e) {
+      err.textContent = e instanceof TypeError ? connectionMessage() : e.message;
+      err.hidden = false;
+    } finally {
+      btn.disabled = false; btn.textContent = "Estimate value";
+    }
+  });
+
+  /* ---------------- CSV batch ---------------- */
+  let last = null;
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((n) => drop.addEventListener(n, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((n) => drop.addEventListener(n, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) handleFile(f); });
+  $("file").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) handleFile(f); });
+
+  async function handleFile(file) {
+    const err = $("batch-error");
+    err.hidden = true;
+    $("drop-sub").textContent = `Estimating ${file.name}…`;
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const res = await fetch(`${API_BASE}/api/predict-csv`, { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "The server could not read that file.");
+      last = data;
+      showBatch(data);
+      $("drop-sub").textContent = `${file.name}. Drop another file to replace it.`;
+    } catch (e) {
+      err.textContent = e instanceof TypeError ? connectionMessage() : e.message;
+      err.hidden = false;
+      $("drop-sub").textContent = "Choose a different file to try again.";
+    }
+  }
+
+  const mix = (t) => {
+    const a = [27, 107, 134], b = [242, 150, 30];
+    return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",")})`;
+  };
+
+  function showBatch({ rows, count }) {
+    const preds = rows.map((r) => r[PRED]).filter(Number.isFinite).sort((a, b) => a - b);
+    const mean = preds.reduce((s, v) => s + v, 0) / preds.length;
+    const q = (p) => preds[Math.min(preds.length - 1, Math.floor(p * preds.length))];
+    const lo = q(0.05), hi = q(0.95);
+
+    $("batch-empty").hidden = true;
+    $("batch-done").hidden = false;
+    countUp($("b-mean"), mean);
+    $("b-count").textContent = count.toLocaleString();
+    $("b-min").textContent = money(preds[0]);
+    $("b-max").textContent = money(preds[preds.length - 1]);
+
+    dots.replaceChildren();
+    const stride = Math.max(1, Math.ceil(rows.length / 2500));
+    for (let i = 0; i < rows.length; i += stride) {
+      const r = rows[i];
+      if (r.longitude == null || r.latitude == null || !Number.isFinite(r[PRED])) continue;
+      const [x, y] = proj(r.longitude, r.latitude);
+      const c = document.createElementNS(SVGNS, "circle");
+      c.setAttribute("cx", x.toFixed(1)); c.setAttribute("cy", y.toFixed(1)); c.setAttribute("r", 2);
+      c.setAttribute("fill", mix(hi === lo ? 0.5 : Math.max(0, Math.min(1, (r[PRED] - lo) / (hi - lo)))));
+      c.setAttribute("fill-opacity", ".75");
+      dots.append(c);
+    }
+
+    // preview table
+    const cols = [["longitude", "Longitude", 2], ["latitude", "Latitude", 2], ["ocean_proximity", "Ocean proximity"], ["median_income", "Median income", 2], [PRED, "Estimated value", "money"]];
+    const head = "<tr>" + cols.map(([, h, f]) => `<th class="${f ? "num" : ""}">${h}</th>`).join("") + "</tr>";
+    const body = rows.slice(0, 8).map((r) => "<tr>" + cols.map(([k, , f]) => {
+      const v = r[k];
+      const text = v == null ? "" : f === "money" ? money(v) : typeof f === "number" ? Number(v).toFixed(f) : String(v).replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch]));
+      return `<td class="${f ? "num" : ""}">${text}</td>`;
+    }).join("") + "</tr>").join("");
+    $("table").innerHTML = head + body;
+    $("table-note").textContent = `Showing the first ${Math.min(8, rows.length)} of ${count.toLocaleString()} rows.`;
+    $("table-wrap").hidden = false;
+  }
+
+  $("download").addEventListener("click", () => {
+    if (!last) return;
+    const esc = (v) => (v == null ? "" : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+    const csv = [last.columns.join(","), ...last.rows.map((r) => last.columns.map((c) => esc(r[c])).join(","))].join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = "predictions.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+})();
+</script>
+</body>
+</html>

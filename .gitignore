@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+venv/
+.venv/
+
+# VS Code
+.vscode/
+
+# Large model
+model.pkl
+
+# Excel/data files
+housing.xlsx
+input.xlsx
+
+# Environment variables
+.env
